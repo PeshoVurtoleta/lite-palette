@@ -1,0 +1,141 @@
+# @zakkster/lite-palette v1.0.0
+
+> High-performance color utilities for HTML5 game engines and web apps: WCAG contrast enforcement, multi-stop color scales, and image palette extraction.
+
+## Overview
+
+`@zakkster/lite-palette` is a utility belt for procedural UI theming. It favors mathematical performance over heavy statistical libraries (e.g., quantization instead of K-Means clustering for image extraction).
+
+It exports three classes (`A11yColor`, `ColorScale`, `ImagePalette`) and a constants object (`WCAG_RATIOS`).
+
+**Dependencies:** `@zakkster/lite-color` (OKLCH parsing/interpolation), `@zakkster/lite-lerp` (scalar lerp for binary search).
+
+## Import
+
+```javascript
+import { A11yColor, ColorScale, ImagePalette, WCAG_RATIOS } from '@zakkster/lite-palette';
+```
+
+## API Reference
+
+### 1. WCAG_RATIOS (Constants)
+
+Standard WCAG 2.1 contrast ratio thresholds.
+
+| Constant | Value | Use Case |
+|---|---|---|
+| `AA_TEXT` | 4.5 | Standard 14pt text |
+| `AA_LARGE` | 3.0 | Headers, 18pt+ text, or bold text |
+| `AAA_TEXT` | 7.0 | Maximum accessibility strictness |
+| `UI_COMPONENT` | 3.0 | Borders, icons, graphical objects |
+
+### 2. A11yColor
+
+Handles luminance, contrast, and automated accessibility enforcement. All methods take **hex strings** (e.g., `"#FF0000"`).
+
+| Method | Returns | Description |
+|---|---|---|
+| `.getLuminance(hex)` | `number` | Relative luminance (0.0–1.0) using sRGB linearization. |
+| `.getContrast(hex1, hex2)` | `number` | Exact WCAG contrast ratio (1.0–21.0). |
+| `.enforce(text, bg, ratio?)` | `string` | Core feature. Returns a safe text hex. 8-step binary search blending toward black/white until the target ratio is met. `ratio` defaults to `4.5`. |
+
+#### Usage
+
+```javascript
+// Lightens the text until it achieves 4.5:1 against the dark background
+const safeBlue = A11yColor.enforce('#3b82f6', '#1a1a1a', WCAG_RATIOS.AA_TEXT);
+```
+
+### 3. ColorScale
+
+Procedural generation of linear and multi-stop color gradients. All methods take and return **OKLCH CSS strings** (e.g., `"oklch(0.7 0.15 180)"`).
+
+| Method | Returns | Description |
+|---|---|---|
+| `.linear(start, end, steps?)` | `string[]` | Array of `steps` OKLCH colors evenly interpolated. Defaults to 5. |
+| `.multiStop(stops, totalSteps?)` | `string[]` | Array of `totalSteps` OKLCH colors spread across keyframe stops. Defaults to 10. |
+
+#### Usage
+
+```javascript
+const fireGradient = ColorScale.multiStop(
+    ['oklch(1 0 0)', 'oklch(0.8 0.18 90)', 'oklch(0.5 0.2 30)', 'oklch(0 0 0)'],
+    20
+);
+```
+
+### 4. ImagePalette
+
+Extracts dominant colors from an image via canvas-based quantization. **Requires a DOM environment.**
+
+| Method | Returns | Description |
+|---|---|---|
+| `.extract(img, max?, sampleSize?, quant?)` | `string[]` | Top `max` dominant hex colors sorted by prominence. |
+
+#### Parameters
+
+- `img` (`HTMLImageElement`): The loaded image.
+- `max` (`number`, default: 5): How many colors to return.
+- `sampleSize` (`number`, default: 64): Downscale constraint for performance on large images.
+- `quant` (`number`, default: 16): Quantization bin size. Lower = more accurate but fragmented. Higher = tighter clustering.
+
+#### Usage
+
+```javascript
+const img = new Image();
+img.crossOrigin = "Anonymous"; // Required for cross-origin images
+img.src = "hero.png";
+img.onload = () => {
+    const colors = ImagePalette.extract(img, 3);
+    // ['#1e293b', '#e2e8f0', '#ef4444']
+};
+```
+
+## Critical Caveats
+
+1. **DOM Canvas Dependency.** `ImagePalette.extract()` uses `<canvas>` and `getImageData()`. It will fail in pure Node.js unless the canvas is mocked.
+
+2. **CORS / Tainted Canvas.** Cross-origin images throw `DOMException` unless `img.crossOrigin = "Anonymous"` is set before `img.src`.
+
+3. **Binary Search Cap.** `A11yColor.enforce()` hard-caps at 8 iterations. This is mathematically sufficient for 8-bit channel accuracy (2^8 = 256) and guarantees O(1) time.
+
+4. **Valid Hex Required.** `A11yColor` expects `#RRGGBB` hex strings. Named CSS colors (`"red"`) or `rgb()` strings will fail.
+
+5. **ColorScale uses OKLCH, not hex.** `ColorScale.linear()` and `.multiStop()` accept and return OKLCH CSS strings, not hex. Use `@zakkster/lite-color` for conversion if needed.
+
+## Correct Usage Patterns
+
+### WCAG Enforcement in Dynamic Themes
+
+```javascript
+const bgColor = '#1a1a2e';
+const generatedText = '#2b2b5e'; // Too dark, fails WCAG
+
+const safe = A11yColor.enforce(generatedText, bgColor, WCAG_RATIOS.AA_TEXT);
+// safe is now a lighter variant that passes 4.5:1
+```
+
+### Health Bar Gradient
+
+```javascript
+const healthScale = ColorScale.linear('oklch(0.55 0.2 30)', 'oklch(0.75 0.2 140)', 10);
+// 10 steps from red to green in perceptually uniform OKLCH space
+```
+
+### Dynamic Theme from Album Art
+
+```javascript
+img.onload = () => {
+    const [primary, secondary, accent] = ImagePalette.extract(img, 3);
+    document.body.style.setProperty('--bg', primary);
+    document.body.style.setProperty('--text', A11yColor.enforce(secondary, primary));
+    document.body.style.setProperty('--accent', accent);
+};
+```
+
+## Performance Characteristics
+
+- `A11yColor.enforce()`: Exactly 8 iterations, O(1). No loops, no recursion.
+- `ColorScale.linear()`: O(n) where n = steps. One OKLCH lerp per step.
+- `ColorScale.multiStop()`: O(n) where n = totalSteps. Uses native `multiStopGradient`.
+- `ImagePalette.extract()`: O(pixels) on a downsampled buffer (default 64x64 = 4096 pixels max). Map-based counting, single pass.

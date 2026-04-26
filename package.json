@@ -1,0 +1,62 @@
+{
+  "name": "@zakkster/lite-palette",
+  "author": "Zahary Shinikchiev <shinikchiev@yahoo.com>",
+  "version": "1.0.0",
+  "description": "High-performance color utilities: WCAG contrast enforcement, multi-stop color scales, and image palette extraction.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "A11yColor.js",
+    "ColorScale.js",
+    "ImagePalette.js",
+    "helpers.js",
+    "index.d.ts",
+    "llms.txt",
+    "README.md"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/PeshoVurtoleta/lite-palette#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PeshoVurtoleta/lite-palette.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PeshoVurtoleta/lite-palette/issues",
+    "email": "shinikchiev@yahoo.com"
+  },
+  "dependencies": {
+    "@zakkster/lite-color": "^1.0.0",
+    "@zakkster/lite-lerp": "^1.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "bundle-check": "npx esbuild index.js --bundle --format=esm --outfile=test-bundle.js",
+    "prepublishOnly": "npm run test && npm run bundle-check"
+  },
+  "keywords": [
+    "color",
+    "wcag",
+    "contrast",
+    "accessibility",
+    "palette",
+    "quantization",
+    "gradient",
+    "canvas",
+    "html5",
+    "oklch",
+    "image-palette"
+  ]
+}
