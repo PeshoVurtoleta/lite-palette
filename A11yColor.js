@@ -6,19 +6,24 @@ export const WCAG_RATIOS = { AA_TEXT: 4.5, AA_LARGE: 3.0, AAA_TEXT: 7.0, UI_COMP
 export class A11yColor {
     static getLuminance(hex) {
         const { r, g, b } = parseHex(hex);
-        const [R, G, B] = [r, g, b].map(c => {
-            const srgb = c / 255;
-            return srgb <= 0.03928 ? srgb / 12.92 : Math.pow((srgb + 0.055) / 1.055, 2.4);
-        });
+        return A11yColor._luminanceFromRGB(r, g, b);
+    }
+
+    /** @internal Skip the parseHex hop when RGB values are already in hand. */
+    static _luminanceFromRGB(r, g, b) {
+        const sR = r / 255;
+        const sG = g / 255;
+        const sB = b / 255;
+        const R = sR <= 0.03928 ? sR / 12.92 : Math.pow((sR + 0.055) / 1.055, 2.4);
+        const G = sG <= 0.03928 ? sG / 12.92 : Math.pow((sG + 0.055) / 1.055, 2.4);
+        const B = sB <= 0.03928 ? sB / 12.92 : Math.pow((sB + 0.055) / 1.055, 2.4);
         return 0.2126 * R + 0.7152 * G + 0.0722 * B;
     }
 
     static getContrast(color1, color2) {
         const lum1 = this.getLuminance(color1);
         const lum2 = this.getLuminance(color2);
-        const lightest = Math.max(lum1, lum2);
-        const darkest = Math.min(lum1, lum2);
-        return (lightest + 0.05) / (darkest + 0.05);
+        return (Math.max(lum1, lum2) + 0.05) / (Math.min(lum1, lum2) + 0.05);
     }
 
     /**
@@ -56,35 +61,39 @@ export class A11yColor {
 
         if (textHex.toLowerCase() === bgHex.toLowerCase()) return extremeHex;
 
-        let currentContrast = this.getContrast(textHex, bgHex);
-        if (currentContrast >= targetRatio) return textHex;
-
         const startRGB = parseHex(textHex);
         const targetRGB = parseHex(extremeHex);
 
+        // Check the input directly — no hex round-trip
+        const startLum = A11yColor._luminanceFromRGB(startRGB.r, startRGB.g, startRGB.b);
+        const startRatio =
+            (Math.max(startLum, bgLum) + 0.05) / (Math.min(startLum, bgLum) + 0.05);
+        if (startRatio >= targetRatio) return textHex;
+
         let bestHex = textHex;
+        let bestRatio = startRatio;
         let low = 0;
         let high = 1;
 
         for (let i = 0; i < 8; i++) {
             const mid = (low + high) / 2;
+            const r = Math.round(lerp(startRGB.r, targetRGB.r, mid));
+            const g = Math.round(lerp(startRGB.g, targetRGB.g, mid));
+            const b = Math.round(lerp(startRGB.b, targetRGB.b, mid));
 
-            const testHex = toHex(
-                Math.round(lerp(startRGB.r, targetRGB.r, mid)),
-                Math.round(lerp(startRGB.g, targetRGB.g, mid)),
-                Math.round(lerp(startRGB.b, targetRGB.b, mid))
-            );
+            const testLum = A11yColor._luminanceFromRGB(r, g, b);
+            const ratio =
+                (Math.max(testLum, bgLum) + 0.05) / (Math.min(testLum, bgLum) + 0.05);
 
-            const contrast = this.getContrast(testHex, bgHex);
-
-            if (contrast >= targetRatio) {
-                bestHex = testHex;
+            if (ratio >= targetRatio) {
+                bestHex = toHex(r, g, b); // Only allocate when we keep the result
+                bestRatio = ratio;
                 high = mid;
             } else {
                 low = mid;
             }
         }
 
-        return this.getContrast(bestHex, bgHex) >= targetRatio ? bestHex : extremeHex;
+        return bestRatio >= targetRatio ? bestHex : extremeHex;
     }
 }

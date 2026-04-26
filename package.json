@@ -1,7 +1,7 @@
 {
   "name": "@zakkster/lite-palette",
   "author": "Zahary Shinikchiev <shinikchiev@yahoo.com>",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "High-performance color utilities: WCAG contrast enforcement, multi-stop color scales, and image palette extraction.",
   "type": "module",
   "sideEffects": false,
